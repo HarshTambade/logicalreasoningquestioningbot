@@ -1,9 +1,9 @@
+from flask import Flask, render_template, request, redirect, url_for
 import pandas as pd
 import random
 import hashlib
 import spacy
 from textstat import flesch_kincaid_grade
-from flask import Flask, render_template, request, redirect, url_for
 
 # Load the spaCy model
 nlp = spacy.load('en_core_web_sm')
@@ -14,12 +14,9 @@ df = pd.read_excel(file_path)  # Load Excel file
 
 # Extract questions from the DataFrame
 questions = df['Questions'].tolist()
-print("Questions loaded:", len(questions), "questions")
 
 # Store user sessions
 user_sessions = {}
-
-app = Flask(__name__)
 
 def hash_email(name, email):
     """Generate a hash based on the name and email to use for random seed."""
@@ -44,7 +41,6 @@ def get_current_question(student_id):
     """Retrieve the current question for the student."""
     if student_id not in user_sessions:
         raise ValueError(f"Session for student_id '{student_id}' not found.")
-
     session = user_sessions[student_id]
     question = session.get("question")
     return question
@@ -93,27 +89,28 @@ def evaluate_response(user_response):
 
     return feedback
 
+app = Flask(__name__)
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/start', methods=['POST'])
-def start():
+@app.route('/start_session', methods=['POST'])
+def start_session_route():
     name = request.form['name']
     email = request.form['email']
     student_id = start_session(name, email)
-    return redirect(url_for('questions', student_id=student_id))
+    return redirect(url_for('question', student_id=student_id))
 
-@app.route('/questions/<student_id>')
-def questions(student_id):
-    question = get_current_question(student_id)
-    return render_template('question.html', question=question, student_id=student_id)
-
-@app.route('/submit/<student_id>', methods=['POST'])
-def submit(student_id):
-    user_response = request.form['response']
-    feedback = evaluate_response(user_response)
-    return render_template('feedback.html', feedback=feedback)
+@app.route('/question/<student_id>', methods=['GET', 'POST'])
+def question(student_id):
+    if request.method == 'POST':
+        user_response = request.form['response']
+        feedback = evaluate_response(user_response)
+        return render_template('feedback.html', feedback=feedback)
+    else:
+        question = get_current_question(student_id)
+        return render_template('question.html', question=question, student_id=student_id)
 
 if __name__ == '__main__':
     app.run(debug=True)
